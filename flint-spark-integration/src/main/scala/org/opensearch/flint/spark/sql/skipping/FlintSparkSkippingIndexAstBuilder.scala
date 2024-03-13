@@ -18,8 +18,10 @@ import org.opensearch.flint.spark.sql.FlintSparkSqlAstBuilder.{getFullTableName,
 import org.opensearch.flint.spark.sql.FlintSparkSqlExtensionsParser._
 
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.Command
+import org.apache.spark.sql.execution.command.DescribeTableCommand
 import org.apache.spark.sql.types.{ArrayType, MapType, StringType}
 
 /**
@@ -100,37 +102,16 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
       ctx: AnalyzeSkippingIndexStatementContext): Command = {
 
     val outputSchema = Seq(
-      AttributeReference("rule", StringType, nullable = false)(),
-      AttributeReference("recommendation", ArrayType(MapType(StringType, StringType)), nullable = false)(),
-      AttributeReference("unsupported columns", ArrayType(StringType), nullable = false)())
+      AttributeReference("column_name", StringType, nullable = false)(),
+      AttributeReference("column_type", StringType, nullable = false)(),
+      AttributeReference("reason", StringType, nullable = false)(),
+      AttributeReference("skipping_type", StringType, nullable = false)())
 
     FlintSparkSqlCommand(outputSchema) { flint =>
-      Seq(
-          Row("all top-level columns",
-            List(
-              Map("column_name"->"year", "column_type"->"DateType", "skipping_type"->"PARTITION", "reason"->"top level partition column"),
-              Map("column_name"->"month", "column_type"->"StringType", "skipping_type"->"BLOOMFILTER", "reason"->"top level string column"),
-              Map("column_name"->"day", "column_type"->"IntegerType", "skipping_type"->"MIN_MAX", "reason"->"top level integer column"),
-              Map("column_name"->"hour", "column_type"->"TimestampType", "skipping_type"->"PARTITION", "reason"->"top level partition column")
-            ),
-            List("binary_code", "map_column")),
-          Row("all top-level columns and nested columns",
-            List(
-              Map("column_name"->"year", "column_type"->"DateType", "skipping_type"->"PARTITION", "reason"->"top level partition column"),
-              Map("column_name"->"month", "column_type"->"StringType", "skipping_type"->"BLOOMFILTER", "reason"->"top level string column"),
-              Map("column_name"->"day", "column_type"->"IntegerType", "skipping_type"->"MIN_MAX", "reason"->"top level integer column"),
-              Map("column_name"->"hour", "column_type"->"TimestampType", "skipping_type"->"PARTITION", "reason"->"top level partition column")
-            ),
-            List("array column", "decimal value")),
-          Row("first 32 columns",
-            List(
-              Map("column_name"->"year", "column_type"->"DateType", "skipping_type"->"PARTITION", "reason"->"top level partition column"),
-              Map("column_name"->"month", "column_type"->"StringType", "skipping_type"->"BLOOMFILTER", "reason"->"top level string column"),
-              Map("column_name"->"day", "column_type"->"IntegerType", "skipping_type"->"MIN_MAX", "reason"->"top level integer column"),
-              Map("column_name"->"hour", "column_type"->"TimestampType", "skipping_type"->"PARTITION", "reason"->"top level partition column")
-            ),
-            List())
-        )
+      Seq(Row("year", "DateType", "PARTITION", "top level partition column"),
+            Row("month", "StringType", "BLOOMFILTER", "top level string column"),
+            Row("day", "IntegerType", "MIN_MAX", "top level integer column"),
+            Row("hour", "TimestampType", "PARTITION", "top level partition column"))
     }
   }
 
