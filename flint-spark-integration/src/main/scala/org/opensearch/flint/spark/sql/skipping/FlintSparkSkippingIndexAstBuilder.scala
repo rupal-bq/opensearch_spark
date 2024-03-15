@@ -133,6 +133,26 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
     }
   }
 
+  override def visitAnalyzeSkippingIndexStatement(
+    ctx: AnalyzeSkippingIndexStatementContext): Command = {
+      val outputSchema = Seq(
+        AttributeReference("column_name", StringType, nullable = false)(),
+        AttributeReference("column_type", StringType, nullable = false)(),
+        AttributeReference("reason", StringType, nullable = false)(),
+        AttributeReference("skipping_type", StringType, nullable = false)())
+
+    FlintSparkSqlCommand(outputSchema) { flint =>
+      Seq(Row("@timestamp", "timestamp", "BLOOM_FILTER", "BLOOM_FILTER is recommended for timestamp data type"),
+        Row("clientip", "string", "BLOOMFILTER", "BLOOM_FILTER is recommended for string data type"),
+        Row("request", "string", "BLOOM_FILTER", "BLOOM_FILTER is recommended for string data type"),
+        Row("status", "integer", "MIN_MAX", "MIN_MAX is recommended for integer data type"),
+        Row("size", "integer", "MIN_MAX", "MIN_MAX is recommended for integer data type"),
+        Row("year", "integer", "PARTITION", "PARTITION is recommended for partition column"),
+        Row("month", "integer", "PARTITION", "PARTITION is recommended for partition column"),
+        Row("day", "integer", "PARTITION", "PARTITION is recommended for partition column"))
+    }
+  }
+
   private def getSkippingIndexName(flint: FlintSpark, tableNameCtx: RuleNode): String =
     FlintSparkSkippingIndex.getSkippingIndexName(getFullTableName(flint, tableNameCtx))
 }
