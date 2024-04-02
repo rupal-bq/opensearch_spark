@@ -64,8 +64,8 @@ vacuumSkippingIndexStatement
 
 analyzeSkippingIndexStatement
     : ANALYZE SKIPPING INDEX
-        (ON tableName)?
-        (LEFT_PAREN indexColumns=multipartIdentifierPropertyList RIGHT_PAREN)?
+        (ON tableName (LEFT_PAREN indexColumns=multipartIdentifierPropertyList RIGHT_PAREN)?)
+        | ( WITH query=sqlQuery)
     ;
 
 coveringIndexStatement
@@ -174,6 +174,10 @@ recoverIndexJobStatement
  * so WITH clause won't be captured by this rule.
  */
 materializedViewQuery
+    : .+?
+    ;
+
+sqlQuery
     : .+?
     ;
 
