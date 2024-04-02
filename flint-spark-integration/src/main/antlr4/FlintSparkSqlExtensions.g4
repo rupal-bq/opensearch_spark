@@ -64,7 +64,8 @@ vacuumSkippingIndexStatement
 
 analyzeSkippingIndexStatement
     : ANALYZE SKIPPING INDEX
-        (ON tableName (LEFT_PAREN indexColumns=multipartIdentifierPropertyList RIGHT_PAREN)?)
+        (ON tableName
+        (LEFT_PAREN indexColumns=multipartIdentifierPropertyList RIGHT_PAREN)?)
         | ( WITH query=sqlQuery)
     ;
 
