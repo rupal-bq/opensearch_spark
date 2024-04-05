@@ -37,6 +37,8 @@ class RecommendationRules {
       rules.getString("recommendation.table_partition.PARTITION.skipping_type")
     } else if (dataTypes.contains(input)) {
       rules.getString("recommendation.data_type_rules." + input + ".skipping_type")
+    } else if (functions.contains(input)) {
+      rules.getString("recommendation.function_rules." + input + ".skipping_type")
     } else {
       null
     }
@@ -55,10 +57,11 @@ class RecommendationRules {
       rules.getString("recommendation.table_partition.PARTITION.reason")
     } else if (dataTypes.contains(input)) {
       rules.getString("recommendation.data_type_rules." + input + ".reason")
+    } else if (functions.contains(input)) {
+      rules.getString("recommendation.function_rules." + input + ".reason")
     } else {
       null
     }
-
   }
 
   /**

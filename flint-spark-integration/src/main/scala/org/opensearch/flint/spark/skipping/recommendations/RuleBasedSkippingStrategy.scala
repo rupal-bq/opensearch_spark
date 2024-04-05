@@ -6,6 +6,8 @@
 package org.opensearch.flint.spark.skipping.recommendations
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.Map
+import scala.collection.mutable.Set
 
 import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.connector.catalog.Table
@@ -14,7 +16,7 @@ import org.apache.spark.sql.flint.{findField, loadTable, parseTableName}
 /**
  * Data type based skipping index column and algorithm selection.
  */
-class DataTypeSkippingStrategy extends AnalyzeSkippingStrategy {
+class RuleBasedSkippingStrategy extends AnalyzeSkippingStrategy {
 
   /**
    * Recommend skipping index columns and algorithm.
@@ -25,17 +27,31 @@ class DataTypeSkippingStrategy extends AnalyzeSkippingStrategy {
    *   skipping index recommendation dataframe
    */
   override def analyzeSkippingIndexColumns(
-      inputs: Map[String, List[String]],
+      inputs: Map[String, Map[String, Set[String]]],
       spark: SparkSession): Seq[Row] = {
 
-    val table = getTable(inputs, spark)
+    val tableName = inputs.keySet.toList(0)
+    val table = getTable(tableName, spark)
     val partitionFields = getPartitionFields(table)
     val recommendations = new RecommendationRules
 
     val result = ArrayBuffer[Row]()
-    getColumnsList(inputs, spark).foreach(column => {
+    val columns = getColumnsMap(table, inputs.get(tableName).get)
+    columns.keySet.foreach(column => {
       val field = findField(table.schema(), column).get
-      if (partitionFields.contains(column)) {
+      if (columns.get(column).get.size > 0) {
+        columns
+          .get(column)
+          .foreach(functions => {
+            functions.foreach(function => {
+              result += Row(
+                field.name,
+                field.dataType.typeName,
+                recommendations.getSkippingType(function),
+                recommendations.getReason(function))
+            })
+          })
+      } else if (partitionFields.contains(column)) {
         result += Row(
           field.name,
           field.dataType.typeName,
@@ -64,25 +80,26 @@ class DataTypeSkippingStrategy extends AnalyzeSkippingStrategy {
     }
   }
 
-  private def getColumnsList(
-      inputs: Map[String, List[String]],
-      spark: SparkSession): List[String] = {
-    val table = getTable(inputs, spark)
-    if (inputs.contains("columns") && (!inputs.get("columns").get.isEmpty)) {
-      inputs.get("columns").get
+  private def getColumnsMap(
+      table: Table,
+      columns: Map[String, Set[String]]): Map[String, Set[String]] = {
+    if (columns.isEmpty) {
+      val columnsMap = Map[String, Set[String]]()
+      table
+        .schema()
+        .fields
+        .map(field => {
+          columnsMap += (field.name -> Set.empty)
+        })
+      columnsMap
     } else {
-      table.schema().fields.map(field => field.name).toList
+      columns
     }
   }
 
-  private def getTable(inputs: Map[String, List[String]], spark: SparkSession): Table = {
-    if (inputs.contains("table name")) {
-      val tableName = inputs.get("table name").get(0)
-      val (catalog, ident) = parseTableName(spark, tableName)
-      loadTable(catalog, ident).getOrElse(
-        throw new IllegalStateException(s"Table $tableName is not found"))
-    } else {
-      throw new IllegalArgumentException("Table name not found")
-    }
+  private def getTable(tableName: String, spark: SparkSession): Table = {
+    val (catalog, ident) = parseTableName(spark, tableName)
+    loadTable(catalog, ident).getOrElse(
+      throw new IllegalStateException(s"Table $tableName is not found"))
   }
 }

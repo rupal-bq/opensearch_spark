@@ -64,9 +64,9 @@ vacuumSkippingIndexStatement
 
 analyzeSkippingIndexStatement
     : ANALYZE SKIPPING INDEX
-        (ON tableName
-        (LEFT_PAREN indexColumns=multipartIdentifierPropertyList RIGHT_PAREN)?)
-        | ( WITH query=sqlQuery)
+        (ON tableName)?
+        (LEFT_PAREN indexColumns=multipartIdentifierPropertyList RIGHT_PAREN)?
+        (WITH query=analyzeSqlQuery)?
     ;
 
 coveringIndexStatement
@@ -178,8 +178,30 @@ materializedViewQuery
     : .+?
     ;
 
-sqlQuery
-    : .+?
+analyzeSqlQuery
+    : anyString fromClause? analyzeWhereClause?
+    ;
+
+anyString
+    : (~FROM ~WHERE)+
+    ;
+
+fromClause
+    : FROM tableName
+    ;
+
+analyzeWhereClause
+    : WHERE analyzeConditionsList
+    ;
+
+analyzeConditionsList
+    : analyzeCondition (COMMA analyzeCondition)*
+    ;
+
+analyzeCondition
+    : key=multipartIdentifier
+    function=(EQ | LessThan | LessThanOrEqual | GreaterThan | GreaterThanOrEqual | IN)
+    LEFT_PAREN? value=propertyList RIGHT_PAREN?
     ;
 
 whereClause

@@ -6,7 +6,8 @@
 package org.opensearch.flint.spark.sql.skipping
 
 import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Map
+import scala.collection.mutable.Set
 
 import org.antlr.v4.runtime.tree.RuleNode
 import org.opensearch.flint.core.field.bloomfilter.BloomFilterFactory._
@@ -134,19 +135,36 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
       AttributeReference("reason", StringType, nullable = false)(),
       AttributeReference("skipping_type", StringType, nullable = false)())
 
-    val columns = ListBuffer[String]()
-    if (ctx.indexColumns != null) {
-      ctx.indexColumns.multipartIdentifierProperty().forEach { indexColCtx =>
-        columns += indexColCtx.multipartIdentifier().getText
-      }
+    val tableName = if (ctx.tableName() != null) {
+      ctx.tableName().getText
+    } else if (ctx.query.fromClause().tableName() != null && ctx.query
+        .analyzeWhereClause() != null) {
+      ctx.query.fromClause().tableName().getText
+    } else {
+      throw new IllegalArgumentException(s"query cannot be accelerated")
     }
 
-    val inputs = Map[String, List[String]](
-      "table name" -> List(ctx.tableName().getText),
-      "columns" -> columns.toList)
+    val columns = Map[String, Set[String]]()
+    if (ctx.indexColumns != null) {
+      ctx.indexColumns.multipartIdentifierProperty().forEach { indexColCtx =>
+        columns += (indexColCtx.multipartIdentifier().getText -> Set.empty)
+      }
+    } else if (ctx.query != null && ctx.query.analyzeWhereClause() != null) {
+      ctx.query
+        .analyzeWhereClause()
+        .analyzeConditionsList()
+        .analyzeCondition()
+        .forEach({ condition =>
+          if (columns.contains(condition.key.getText)) {
+            columns.get(condition.key.getText).get += condition.function.getText
+          } else {
+            columns += (condition.key.getText -> Set(condition.function.getText))
+          }
+        })
+    }
 
     FlintSparkSqlCommand(outputSchema) { flint =>
-      flint.analyzeSkippingIndex(inputs)
+      flint.analyzeSkippingIndex(Map[String, Map[String, Set[String]]](tableName -> columns))
     }
   }
 
@@ -178,4 +196,5 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
 
   private def getSkippingIndexName(flint: FlintSpark, tableNameCtx: RuleNode): String =
     FlintSparkSkippingIndex.getSkippingIndexName(getFullTableName(flint, tableNameCtx))
+
 }

@@ -4,6 +4,9 @@
  */
 package org.opensearch.flint.spark.skipping.recommendations
 
+import scala.collection.mutable.Map
+import scala.collection.mutable.Set
+
 import org.apache.spark.sql.{Row, SparkSession}
 
 /**
@@ -20,7 +23,6 @@ trait AnalyzeSkippingStrategy {
    *   skipping index recommendation dataframe
    */
   def analyzeSkippingIndexColumns(
-      inputs: Map[String, List[String]],
+      inputs: Map[String, Map[String, Set[String]]],
       spark: SparkSession): Seq[Row]
-
 }

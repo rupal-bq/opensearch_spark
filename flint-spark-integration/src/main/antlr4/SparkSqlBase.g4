@@ -165,6 +165,7 @@ DROP: 'DROP';
 EXISTS: 'EXISTS';
 FALSE: 'FALSE';
 FLINT: 'FLINT';
+FROM: 'FROM';
 IF: 'IF';
 IN: 'IN';
 INDEX: 'INDEX';
@@ -187,7 +188,10 @@ WITH: 'WITH';
 
 EQ  : '=' | '==';
 MINUS: '-';
-
+LessThan: '<';
+LessThanOrEqual: '<=';
+GreaterThan: '>';
+GreaterThanOrEqual: '>=';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''
@@ -196,16 +200,16 @@ STRING
     | 'R"'(~'"')* '"'
     ;
 
+IDENTIFIER
+    : (LETTER | DIGIT | '_')+
+    ;
+
 INTEGER_VALUE
     : DIGIT+
     ;
 
 DECIMAL_VALUE
     : DECIMAL_DIGITS {isValidDecimal()}?
-    ;
-
-IDENTIFIER
-    : (LETTER | DIGIT | '_')+
     ;
 
 BACKQUOTED_IDENTIFIER
@@ -222,7 +226,7 @@ fragment DIGIT
     ;
 
 fragment LETTER
-    : [A-Z]
+    : [a-zA-Z]
     ;
 
 SIMPLE_COMMENT
