@@ -93,6 +93,14 @@ multipartIdentifierProperty
     : multipartIdentifier (options=propertyList)?
     ;
 
+valueList
+    : valueIdentifier (COMMA valueIdentifier)*
+    ;
+
+valueIdentifier
+    : propertyValue
+    ;
+
 propertyList
     : property (COMMA property)*
     ;
@@ -200,16 +208,16 @@ STRING
     | 'R"'(~'"')* '"'
     ;
 
-IDENTIFIER
-    : (LETTER | DIGIT | '_')+
-    ;
-
 INTEGER_VALUE
     : DIGIT+
     ;
 
 DECIMAL_VALUE
     : DECIMAL_DIGITS {isValidDecimal()}?
+    ;
+
+IDENTIFIER
+    : (LETTER | DIGIT | '_')+
     ;
 
 BACKQUOTED_IDENTIFIER

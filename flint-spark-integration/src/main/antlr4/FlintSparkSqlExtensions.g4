@@ -201,7 +201,7 @@ analyzeConditionsList
 analyzeCondition
     : key=multipartIdentifier
     function=(EQ | LessThan | LessThanOrEqual | GreaterThan | GreaterThanOrEqual | IN)
-    LEFT_PAREN? value=propertyList RIGHT_PAREN?
+    LEFT_PAREN? value=valueList RIGHT_PAREN?
     ;
 
 whereClause
