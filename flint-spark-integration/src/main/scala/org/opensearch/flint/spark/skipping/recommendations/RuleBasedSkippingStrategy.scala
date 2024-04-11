@@ -6,10 +6,8 @@
 package org.opensearch.flint.spark.skipping.recommendations
 
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Map
-import scala.collection.mutable.Set
 
-import org.apache.spark.sql.{Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.apache.spark.sql.connector.catalog.Table
 import org.apache.spark.sql.flint.{findField, loadTable, parseTableName}
 
@@ -21,50 +19,51 @@ class RuleBasedSkippingStrategy extends AnalyzeSkippingStrategy {
   /**
    * Recommend skipping index columns and algorithm.
    *
-   * @param inputs
-   *   inputs for recommendation strategy. This can table name, columns or functions.
+   * @param data
+   *   data for static rule based recommendation. This can table name and columns.
    * @return
    *   skipping index recommendation dataframe
    */
-  override def analyzeSkippingIndexColumns(
-      inputs: Map[String, Map[String, Set[String]]],
-      spark: SparkSession): Seq[Row] = {
 
-    val tableName = inputs.keySet.toList(0)
-    val table = getTable(tableName, spark)
-    val partitionFields = getPartitionFields(table)
-    val recommendations = new RecommendationRules
-
+  override def analyzeSkippingIndexColumns(data: DataFrame, spark: SparkSession): Seq[Row] = {
     val result = ArrayBuffer[Row]()
-    val columns = getColumnsMap(table, inputs.get(tableName).get)
-    columns.keySet.foreach(column => {
-      val field = findField(table.schema(), column).get
-      if (columns.get(column).get.size > 0) {
-        columns
-          .get(column)
-          .foreach(functions => {
-            functions.foreach(function => {
-              result += Row(
-                field.name,
-                field.dataType.typeName,
-                recommendations.getSkippingType(function),
-                recommendations.getReason(function))
-            })
-          })
-      } else if (partitionFields.contains(column)) {
-        result += Row(
-          field.name,
-          field.dataType.typeName,
-          recommendations.getSkippingType("PARTITION"),
-          recommendations.getReason("PARTITION"))
-      } else if (recommendations.containsRule(field.dataType.toString)) {
-        result += Row(
-          field.name,
-          field.dataType.typeName,
-          recommendations.getSkippingType(field.dataType.toString),
-          recommendations.getReason(field.dataType.toString))
-      }
-    })
+    data
+      .select("tableName")
+      .distinct
+      .collect()
+      .map(_.getString(0))
+      .foreach(tableName => {
+        val table = getTable(tableName, spark)
+        val partitionFields = getPartitionFields(table)
+        var columns: List[String] = data
+          .filter(s"tableName = '$tableName'")
+          .select("columns")
+          .distinct()
+          .collect()
+          .map(_.getString(0))
+          .toList
+          .filter(_ != null)
+
+        if (columns.isEmpty) {
+          columns = table.schema().fields.map(field => field.name).toList
+        }
+        columns.foreach(column => {
+          val field = findField(table.schema(), column).get
+          if (partitionFields.contains(column)) {
+            result += Row(
+              field.name,
+              field.dataType.typeName,
+              RecommendationRules.getSkippingType("PARTITION"),
+              RecommendationRules.getReason("PARTITION"))
+          } else if (RecommendationRules.containsRule(field.dataType.toString)) {
+            result += Row(
+              field.name,
+              field.dataType.typeName,
+              RecommendationRules.getSkippingType(field.dataType.toString),
+              RecommendationRules.getReason(field.dataType.toString))
+          }
+        })
+      })
     result
   }
 
@@ -77,23 +76,6 @@ class RuleBasedSkippingStrategy extends AnalyzeSkippingStrategy {
         })
         .flatten
         .toSet
-    }
-  }
-
-  private def getColumnsMap(
-      table: Table,
-      columns: Map[String, Set[String]]): Map[String, Set[String]] = {
-    if (columns.isEmpty) {
-      val columnsMap = Map[String, Set[String]]()
-      table
-        .schema()
-        .fields
-        .map(field => {
-          columnsMap += (field.name -> Set.empty)
-        })
-      columnsMap
-    } else {
-      columns
     }
   }
 

@@ -6,8 +6,6 @@
 package org.opensearch.flint.spark.sql.skipping
 
 import scala.collection.JavaConverters.collectionAsScalaIterableConverter
-import scala.collection.mutable.Map
-import scala.collection.mutable.Set
 
 import org.antlr.v4.runtime.tree.RuleNode
 import org.opensearch.flint.core.field.bloomfilter.BloomFilterFactory._
@@ -23,7 +21,7 @@ import org.opensearch.flint.spark.sql.FlintSparkSqlExtensionsParser._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.expressions.AttributeReference
 import org.apache.spark.sql.catalyst.plans.logical.Command
-import org.apache.spark.sql.types.StringType
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
 
 /**
  * Flint Spark AST builder that builds Spark command for Flint skipping index statement.
@@ -135,6 +133,7 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
       AttributeReference("reason", StringType, nullable = false)(),
       AttributeReference("skipping_type", StringType, nullable = false)())
 
+    var data = Seq.empty[Row]
     val tableName = if (ctx.tableName() != null) {
       ctx.tableName().getText
     } else if (ctx.query.fromClause().tableName() != null && ctx.query
@@ -144,10 +143,12 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
       throw new IllegalArgumentException(s"query cannot be accelerated")
     }
 
-    val columns = Map[String, Set[String]]()
     if (ctx.indexColumns != null) {
       ctx.indexColumns.multipartIdentifierProperty().forEach { indexColCtx =>
-        columns += (indexColCtx.multipartIdentifier().getText -> Set.empty)
+        data = data :+ Row(
+          tableName,
+          indexColCtx.multipartIdentifier().getText,
+          null.asInstanceOf[String])
       }
     } else if (ctx.query != null && ctx.query.analyzeWhereClause() != null) {
       ctx.query
@@ -155,16 +156,19 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
         .analyzeConditionsList()
         .analyzeCondition()
         .forEach({ condition =>
-          if (columns.contains(condition.key.getText)) {
-            columns.get(condition.key.getText).get += condition.function.getText
-          } else {
-            columns += (condition.key.getText -> Set(condition.function.getText))
-          }
+          data = data :+ Row(tableName, condition.key.getText, condition.function.getText)
         })
+    } else {
+      data = data :+ Row(tableName, null.asInstanceOf[String], null.asInstanceOf[String])
     }
+    val schema = StructType(
+      Seq(
+        StructField("tableName", StringType, nullable = false),
+        StructField("columns", StringType, nullable = true),
+        StructField("functions", StringType, nullable = false)))
 
     FlintSparkSqlCommand(outputSchema) { flint =>
-      flint.analyzeSkippingIndex(Map[String, Map[String, Set[String]]](tableName -> columns))
+      flint.analyzeSkippingIndex(schema, data)
     }
   }
 
