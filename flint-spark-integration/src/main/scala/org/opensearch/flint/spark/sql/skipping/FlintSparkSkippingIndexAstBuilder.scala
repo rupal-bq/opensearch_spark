@@ -164,8 +164,8 @@ trait FlintSparkSkippingIndexAstBuilder extends FlintSparkSqlExtensionsVisitor[A
     val schema = StructType(
       Seq(
         StructField("tableName", StringType, nullable = false),
-        StructField("columns", StringType, nullable = true),
-        StructField("functions", StringType, nullable = false)))
+        StructField("column", StringType, nullable = true),
+        StructField("function", StringType, nullable = true)))
 
     FlintSparkSqlCommand(outputSchema) { flint =>
       flint.analyzeSkippingIndex(schema, data)
